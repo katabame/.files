@@ -1,0 +1,4 @@
+machine github.com
+login <github-id>
+password <personal-access-token>
+protocol https
