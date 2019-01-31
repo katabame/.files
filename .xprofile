@@ -1,0 +1,3 @@
+export GCK_IM_MODULE=fcitx
+export QT_IM_MODULE=fcitx
+export XMODIFIERES="@im=fcitx"
