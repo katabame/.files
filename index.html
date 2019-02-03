@@ -1,0 +1,97 @@
+#!/bin/bash
+
+check_success()
+{
+	if [ "$?" -ne "0" ]; then
+		echo -e "\033[31m✘\033[0m"
+		exit 1
+	fi
+	echo -e "\033[32m✔\033[0m"
+}
+
+pacman_update()
+{
+	echo -n -e "\033[37mUpdating pacman database...\033[0m "
+	pacman -Sy > /dev/null
+	check_success
+}
+
+pacman_install()
+{
+	echo -n -e "\033[37mInstalling $@...\033[0m "
+	pacman -S --noconfirm $@ > /dev/null
+	check_success
+}
+
+# ------ #
+
+check_curl()
+{
+	echo -n -e "\033[37mChecking for curl...\033[0m "
+	if command -v curl > /dev/null; then
+		echo -e "\033[32m✔\033[0m"
+	else
+		echo -e "\033[31m？\033[0m"
+		pacman_install curl
+	fi
+}
+
+check_git()
+{
+	echo -n -e "\033[37mChecking for git...\033[0m "
+	if command -v git > /dev/null; then
+		echo -e "\033[32m✔\033[0m"
+	else
+		echo -e "\033[31m？\033[0m"
+		pacman_install git
+	fi
+}
+
+# ------ #
+
+install_fish()
+{
+	pacman_install fish
+	echo -n -e "\033[37mInstalling fisher...\033[0m "
+	curl https://git.io/fisher --create-dirs -sLo ${homedir}/.config/fish/functions/fisher.fish > /dev/null
+	if [ "$?" -ne "0" ]; then
+		echo -e "\033[31m✘\033[0m"
+		exit 1
+	fi
+	echo -e "\033[32m✔\033[0m"
+}
+
+install_dot_files()
+{
+	echo -n -e "\033[37mCloning dot files...\033[0m "
+	git clone --quiet https://github.com/katabame/.files.git ${homedir}/.files
+	check_success
+	bash ${homedir}/.files/deploy.sh
+}
+
+# ------ #
+
+main()
+{
+	homedir=`eval echo ~${SUDO_USER:-$(whoami)}`
+
+	# First off, we need update it right?
+	pacman_update
+
+	# Ok then, make sure we have commands that we will use
+	check_curl
+	check_git
+
+	# Install Japanese Input method
+	pacman_install fcitx-im fcitx-mozc fcitx-configtool
+
+	# Install fish & fisher
+	install_fish
+
+	# Clone .files git repository
+	install_dot_files
+
+	echo "Initialize completed! You have to reboot to apply all effects!"
+}
+
+main
