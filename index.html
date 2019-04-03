@@ -1,0 +1,118 @@
+#!/bin/bash
+set -e
+
+yay_install()
+{
+	echo -e "\033[35m>\033[0m Installing $@..."
+	yay -S --needed --noconfirm --sudoloop $@
+}
+
+yay_uninstall()
+{
+	echo -e "\033[35m>\033[0m Uninstalling $@..."
+	yay -Rsn --noconfirm --sudoloop $@
+}
+
+# ------ #
+
+install_dot_files()
+{
+	if [ -d "${HOME}/.files" ]; then
+		echo -e "\033[35m>\033[0m Removing .files folder..."
+		rm -rf ${HOME}/.files
+	fi
+
+	echo -e "\033[35m>\033[0m Cloning dot files..."
+	git clone https://github.com/katabame/.files.git ${HOME}/.files
+
+	echo -e "\033[35m>\033[0m Creating symbolic links..."
+	while read -d $'\0' src
+	do
+		[[ ${src} =~ ".git" ]] && continue
+		[[ ${src} =~ "CNAME" ]] && continue
+		[[ ${src} =~ "index.html" ]] && continue
+		[[ ${src} =~ "wallpaper.png" ]] && continue
+
+		dst="`echo ${src} | sed -e 's/\.files\///g'`"
+		mkdir -p "${dst%/*}"
+		ln -sfv "${src}" "${dst%/*}"
+	done < <(find ${HOME}/.files -type f -print0)
+
+	echo -e "\033[35m>\033[0m Installing VSCode extentions..."
+	cat "${HOME}/.files/.config/Code - Insiders/User/extentions" | while read line
+	do
+		code-insiders --install-extension $line
+	done
+}
+
+# ------ #
+
+config_deepin()
+{
+	echo -e "\033[35m>\033[0m Configuring Deepin..."
+	dconf write /com/deepin/dde/appearance/gtk-theme "'Flat-Remix-GTK-Dark'"
+	dconf write /com/deepin/dde/appearance/icon-theme "'Flat-Remix-Blue'"
+	dconf write /com/deepin/dde/dock/position "'top'"
+	dconf write /com/deepin/dde/dock/display-mode "'efficient'"
+	dconf write /com/deepin/dde/dock/icon-size 30
+	dconf write /com/deepin/dde/appearance/opacity 0.7
+	dconf write /com/deepin/dde/launcher/fullscreen false
+	dconf write /com/deepin/dde/sound-effect/desktop-login false
+	dconf write /com/deepin/dde/sound-effect/desktop-logout false
+	dconf write /com/deepin/wrap/gnome/desktop/background/picture-uri "'${HOME}/.files/wallpaper.png'"
+}
+
+# ------ #
+
+main()
+{
+	if [ "${USER}" == "root" ]; then
+		echo -e "\033[35m>\033[0m Do not run this as sudo/root"
+		echo -e "\033[35m>\033[0m This will ask password when needed"
+		echo -e "\033[35m>\033[0m Usage: curl https://viola.kataba.me | bash"
+		exit 1
+	fi
+
+	if [[ ! `cat /etc/os-release | gawk 'match($0, /NAME=(.*)$/, a) {print a[1]}'` =~ ArcoLinuxB-deepin.* ]]; then
+		echo -e "\033[35m>\033[0m This OS seems not ArcoLinuxB deepin. Terminating."
+		echo -e "\033[35m>\033[0m This script is assumed to be ran on ArcoLinuxB deepin environments"
+		echo -e "\033[35m>\033[0m See more: https://arcolinux.info/"
+		exit 1
+	fi
+
+	echo -e "\033[35m>\033[0m Killing variety..."
+	pkill -f /usr/bin/variety
+
+	yay -Sy
+
+	yay_install fcitx-im fcitx-mozc fcitx-configtool
+
+	yay_install rmtrash \
+				visual-studio-code-insiders gitkraken \
+				opera-developer chromium discord-canary \
+				nautilus megasync nautilus-megasync \
+				flat-remix-git flat-remix-gtk \
+				fish
+
+	yay_uninstall variety arcolinux-variety-git \
+				  deepin-file-manager deepin-movie mpv \
+				  thunar-archive-plugin thunar exo libxfce4ui arcolinux-xfce-thunar-git \
+				  xterm deepin-terminal \
+				  vim geany arcolinux-geany-git sublime-text-dev \
+				  deepin-music deepin-clone deepin-manual \
+				  vivaldi vivaldi-codecs-ffmpeg-extra-bin
+
+	echo -e "\033[35m>\033[0m Upgrading packages..."
+	yay -Syu --needed --noconfirm --sudoloop
+
+	echo -e "\033[35m>\033[0m Installing fisher..."
+	curl https://git.io/fisher --create-dirs -sLo ${HOME}/.config/fish/functions/fisher.fish
+
+	install_dot_files
+
+    config_deepin
+
+	echo -e "\033[35m>\033[0m Initialize completed! You have to reboot to apply all effects!"
+}
+
+main
